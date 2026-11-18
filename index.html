@@ -192,7 +192,7 @@ body.locked #login{display:flex}
 @media (prefers-reduced-motion:no-preference){.meter i,.chart .got{transition:all .3s}}
 </style>
 </head>
-<body class="locked">
+<body>
 <nav aria-label="Navigation principale">
   <div class="brand">Gestion locative<small id="brandSub"></small></div>
   <div class="navgroup">Tableaux de bord</div>
@@ -251,6 +251,12 @@ const FB={
 /* Toutes les données de cette plateforme sont rangées sous ce document,
    pour ne jamais se mélanger aux autres plateformes du même projet. */
 const RACINE=["apps","gestion-locative"];
+/* Accès à la plateforme :
+   false = accès ouvert, aucune connexion demandée (réglage actuel)
+   true  = chaque agent doit se connecter avec son e-mail et son mot de passe.
+   Pour passer à true : activer E-mail/Mot de passe dans Firebase > Authentication,
+   créer les comptes, et remettre la règle « if request.auth != null » dans Firestore. */
+const CONNEXION_REQUISE=false;
 /* ===================================================================== */
 
 const COLS=["proprietaires","biens","locataires","paiements","maintenance"];
@@ -343,7 +349,7 @@ function errMsg(e){
   if(c==="unavailable")return"Pas de connexion : la modification sera envoyée dès le retour du réseau.";
   return"Enregistrement impossible pour le moment. Réessayez dans un instant.";
 }
-const enLigne=()=>!!(ROOT&&user);
+const enLigne=()=>!!(ROOT&&(user||!CONNEXION_REQUISE));
 async function put(col,id,data){
   if(enLigne()){try{await ROOT.collection(col).doc(id).set(data)}catch(e){toast(errMsg(e));throw e}}
   else{S[col][id]=data;render()}
@@ -416,6 +422,7 @@ function ecouter(){
 }
 
 async function init(){
+  if(CONNEXION_REQUISE)document.body.classList.add("locked");
   if(!FB.apiKey||!window.firebase){
     demo("Configuration Firebase absente : ce que vous saisissez ici sera perdu à la fermeture. Renseignez le bloc FB en haut du fichier index.html.");
     return;
@@ -426,6 +433,7 @@ async function init(){
     try{await db.enablePersistence({synchronizeTabs:true})}catch(e){}
     ROOT=db.collection(RACINE[0]).doc(RACINE[1]);
   }catch(e){demo("La base de données n'a pas pu être initialisée : vérifiez la configuration Firebase du fichier.");return}
+  if(!CONNEXION_REQUISE){verrou(false);$("#navfoot").hidden=true;ecouter();render();return}
   $("#loginHint").textContent=FB.projectId;
   ecranConnexion();
   auth.onAuthStateChanged(u=>{
